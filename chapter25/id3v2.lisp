@@ -57,7 +57,7 @@
     (let ((code (read-value 'u2 in)))
       (when swap (setf code (swap-bytes code)))
       (or (code-char code) (error "Character code ~d not supported" code))))
-  (:writer (out char)
+
     (let ((code (char-code char)))
       (unless (<= 0 code #xffff)
         (error "Illegal character for ucs-2 encoding: ~c with char-code: ~d" char code))
@@ -103,12 +103,16 @@
      :terminator terminator
      :character-type (ucs-2-char-type #xfeff))))
 
-(define-binary-class id3-tag ()
+(define-tagged-binary-class id3-tag ()
   ((identifier     (iso-8859-1-string :length 3))
    (major-version  u1)
    (revision       u1)
    (flags          u1)
-   (size           id3-tag-size)))
+   (size           id3-tag-size))
+  (:dispatch
+   (ecase major-version
+     (2 'id3v2.2-tag)
+     (3 'id3v2.3-tag))))
 
 
 (defun read-id3 (file)
@@ -125,7 +129,6 @@
    (not (directory-pathname-p file))
    (string-equal "mp3" (pathname-type file))))
 
-
 (defun show-tag-headers (dir) 
   (walk-directory dir #'show-tag-header :test #'mp3-p))
 
@@ -140,17 +143,78 @@
   (with-open-file (in file :element-type '(unsigned-byte 8))
     (string= "ID3" (read-value 'iso-8859-1-string in :length 3))))
 
+(define-tagged-binary-class id3-frame ()
+  ((id (frame-id :length 3))
+   (size u3))
+  (:dispatch (find-frame-class id)))
+
+(define-binary-class generic-frame (id3-frame)
+  ((data (raw-bytes :size size))))
+
+(define-binary-type raw-bytes (size)
+  (:reader (in)
+    (let ((buf (make-array size :element-type '(unsigned-byte 8))))
+      (read-sequence buf in)
+      buf))
+  (:writer (out buf)
+    (write-sequence buf out)))
+
+(defun find-frame-class (id)
+  (declare (ignore id))
+  'generic-frame)
 
 
+(define-binary-type id3-frames (tag-size)
+  (:reader (in)
+	   (loop with to-read = tag-size
+	      while (plusp to-read)
+	      for frame = (read-frame in)
+	      while frame
+	      do (decf to-read (+ 6 (size frame)))
+	      collect frame
+	      finally (loop repeat (1- to-read) do (read-byte in))))
+  (:writer (out frames)
+	   (loop with to-write = tag-size
+	      for frame in frames
+	      do (write-value 'id3-frame out frame)
+	      (decf to-write (+ 6 (size frame)))
+	      finally (loop repeat to-write do (write-byte 0 out)))))
 
 
+(define-condition in-padding () ())
+
+(define-binary-type frame-id (length)
+  (:reader (in)
+    (let ((first-byte (read-byte in)))
+      (when (= first-byte 0) (signal 'in-padding))
+      (let ((rest (read-value 'iso-8859-1-string in :length (1- length))))
+	(concatenate
+	 'string (string (code-char first-byte)) rest))))
+  (:writer (out id)
+    (write-value 'iso-8859-1-string out id :length length)))
+
+(defun read-frame (in)
+  (handler-case (read-value 'id3-frame in)
+    (in-padding () nil)))
 
 
+(define-binary-class id3v2.2-tag (id3-tag)
+  ((frames (id3-frames :tag-size size :frame-type 'id3v2.2-frame))))
 
+(define-binary-type optional (type if)
+  (:reader (in)
+    (when if (read-value type in)))
+  (:writer (out value)
+    (when if (write-value type out value))))
 
+(defun extended-p (flags) (logbitp 6 flags))
 
+(defun crc-p (flags extra-flags)
+  (and (extended-p flags) (logbitp 15 extra-flags)))
 
-
-
-
-
+(define-binary-class id3v2.3-tag (id3-tag)
+  ((extended-header-size (optional :type 'u4 :if (extended-p flags)))
+   (extra-flags          (optional :type 'u2 :if (extended-p flags)))
+   (padding-size         (optional :type 'u4 :if (extended-p flags)))
+   (crc                  (optional :type 'u4 :if (crc-p flags extra-flags)))
+   (frames               (id3-frames :tag-size size :frame-type 'id3v2.3-frame))))
