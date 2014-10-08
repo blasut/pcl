@@ -23,21 +23,18 @@
         ,(let (,@(loop for n in names for g in gensyms collect `(,n ,g)))
            ,@body)))))
 
-(defun as-keyword (sym) (intern (string sym) :keyword))
+(defgeneric read-value (type stream &key)
+  (:documentation "Read a value of the given type from the stream."))
 
+(defgeneric write-value (type stream value &key)
+  (:documentation "Write a value as the given type to the stream."))
+
+
+(defun as-keyword (sym) (intern (string sym) :keyword))
 
 (defun slot->defclass-slot (spec)
   (let ((name (first spec)))
     `(,name :initarg ,(as-keyword name) :accessor ,name)))
-
-
-(defmacro define-binary-class (name slots)
-  `(defclass ,name ()
-     ,(mapcar #'slot->defclass-slot slots)))
-
-(defgeneric read-value (type stream &key)
-  (:documentation "Read a value of the given type from the stream."))
-
 
 (defun slot->read-value (spec stream)
   (destructuring-bind (name (type &rest args)) (normalize-slot-spec spec)
@@ -68,8 +65,6 @@
 	 (with-slots ,(mapcar #'first slots) ,objectvar
 	   ,@(mapcar #'(lambda (x) (slot->write-value x streamvar)) slots)))))))))
 
-(defgeneric write-value (type stream value &key)
-  (:documentation "Write a value as the given type to the stream."))
 
 
 
