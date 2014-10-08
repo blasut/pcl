@@ -164,20 +164,20 @@
   'generic-frame)
 
 
-(define-binary-type id3-frames (tag-size)
+(define-binary-type id3-frames (tag-size frame-type)
   (:reader (in)
 	   (loop with to-read = tag-size
 	      while (plusp to-read)
-	      for frame = (read-frame in)
+	      for frame = (read-frame frame-type in)
 	      while frame
-	      do (decf to-read (+ 6 (size frame)))
+	      do (decf to-read (+ (frame-header-size frame) (size frame)))
 	      collect frame
 	      finally (loop repeat (1- to-read) do (read-byte in))))
   (:writer (out frames)
 	   (loop with to-write = tag-size
 	      for frame in frames
-	      do (write-value 'id3-frame out frame)
-	      (decf to-write (+ 6 (size frame)))
+	      do (write-value frame-type out frame)
+	      (decf to-write (+ (frame-header-size frame) (size frame)))
 	      finally (loop repeat to-write do (write-byte 0 out)))))
 
 
@@ -218,3 +218,7 @@
    (padding-size         (optional :type 'u4 :if (extended-p flags)))
    (crc                  (optional :type 'u4 :if (crc-p flags extra-flags)))
    (frames               (id3-frames :tag-size size :frame-type 'id3v2.3-frame))))
+
+(defun read-frame (frame-type in)
+  (handler-case (read-value frame-type in)
+    (in-padding () nil)))
