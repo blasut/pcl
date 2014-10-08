@@ -1,4 +1,6 @@
 *.*~
 *.dx64fsl
 .*.lisp
+*#
+*.lx64fsl
 
