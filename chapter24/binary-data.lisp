@@ -111,7 +111,7 @@
 	 (setf (get ',name 'slots) ',(mapcar #'first slots))
 	 (setf (get ',name 'superclasses) ',superclasses))
 
-       (defclass ,name ,superclasses ()
+       (defclass ,name ,superclasses
 	 ,(mapcar #'slot->defclass-slot slots))
       
        ,read-method

@@ -1,4 +1,16 @@
-(in-package #:pcl.pathnames)
+(defpackage :pcl.pathnames
+  (:use :common-lisp)
+  (:export
+   :list-directory
+   :file-exists-p
+   :directory-pathname-p
+   :file-pathname-p
+   :pathname-as-directory
+   :pathname-as-file
+   :walk-directory
+   :directory-p
+   :file-p))
+
 
 (defun list-directory (dirname)
   "Return a list of the contents of the directory named by dirname.
