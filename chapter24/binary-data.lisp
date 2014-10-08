@@ -115,7 +115,7 @@
 	 ,(mapcar #'slot->defclass-slot slots))
       
        ,read-method
- 
+
        (defmethod write-object progn ((,objectvar ,name) ,streamvar)
 	 (declare (ignorable ,streamvar))
 	 (with-slots ,(new-class-all-slots slots superclasses) ,objectvar
@@ -162,7 +162,7 @@
 	   ,(destructuring-bind ((in) &body body) (rest (assoc :reader spec))
 	      `(defmethod read-value ((,type (eql ',name)) ,in &key ,@args)
 		 ,@body))
-	   ,(destructuring-bind ((out value) &body body) (rest (assoc :write spec))
+	   ,(destructuring-bind ((out value) &body body) (rest (assoc :writer spec))
 	      `(defmethod write-value ((,type (eql ',name)) ,out ,value &key ,@args)
 		 ,@body)))))))
 
