@@ -12,6 +12,8 @@
 	   :current-binary-object
 	   :+null+))
 
+
+
 (defmacro with-gensyms ((&rest names) &body body)
   `(let ,(loop for n in names collect `(,n (gensym)))
      ,@body))
@@ -24,6 +26,8 @@
            ,@body)))))
 
 (defvar *in-progress-objects* nil)
+
+(defconstant +null+ (code-char 0))
 
 (defgeneric read-value (type stream &key)
   (:documentation "Read a value of the given type from the stream."))

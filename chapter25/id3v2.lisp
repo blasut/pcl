@@ -173,10 +173,19 @@
   (:writer (out buf)
     (write-sequence buf out)))
 
-(defun find-frame-class (id)
-  (ecase (length id)
-    (3 'generic-frame-v2.2)
-    (4 'generic-frame-v2.3)))
+(defun find-frame-class (name)
+  (cond
+    ((and (char= (char name 0) #\T)
+	  (not (member name '("TXX" "TXXX") :test #'string=)))
+     (ecase (length name)
+       (3 'text-info-frame-v2.2)
+       (4 'text-info-frame-v2.3)))
+    ((string= name "COM")  'comment-frame-v2.2)
+    ((string= name "COMM") 'comment-frame-v2.3)
+    (t
+     (ecase (length name)
+       (3 'generic-frame-v2.2)
+       (4 'generic-frame-v2.3)))))
 
 (define-binary-type id3-frames (tag-size frame-type)
   (:reader (in)
@@ -262,4 +271,81 @@
 (define-binary-class generic-frame-v2.2 (id3v2.2-frame generic-frame) ())
 
 (define-binary-class generic-frame-v2.3 (id3v2.3-frame generic-frame) ())
+
+(defun frame-types (file)
+  (delete-duplicates (mapcar #'id (frames (read-id3 file))) :test #'string=))
+
+(defun frame-types-in-dir (dir)
+  (let ((ids ()))
+    (flet ((collect (file)
+	     (setf ids (nunion ids (frame-types file) :test #'string=))))
+      (walk-directory dir #'collect :test #'mp3-p))
+    ids))
+
+(defun non-terminated-type (encoding)
+  (ecase encoding
+    (0 'iso-8859-1-string)
+    (1 'ucs-2-string)))
+
+(defun terminated-type (encoding)
+  (ecase encoding
+    (0 'iso-8859-1-terminated-string)
+    (1 'ucs-2-terminated-string)))
+
+(defun string-args (encoding length terminator)
+  (cond
+    (length
+     (values (non-terminated-type encoding) :length length))
+    (terminator
+     (values (terminated-type encoding) :terminator terminator))))
+
+
+(define-binary-type id3-encoded-string (encoding length terminator)
+  (:reader (in)
+	   (multiple-value-bind (type keyword arg)
+	       (string-args encoding length terminator)
+	     (read-value type in keyword arg)))
+  (:writer (out string)
+	   (multiple-value-bind (type keyword arg)
+	       (string-args encoding length terminator)
+	     (write-value type out string keyword arg))))
+
+(define-binary-class test-info-frame()
+  ((encoding u1)
+   (information (id3-encoded-string :encoding encoding :length (bytes-left 1)))))
+
+(defun bytes-left (bytes-read)
+  (- (size (current-binary-object)) bytes-read))
+
+(define-binary-class text-info-frame-v2.2 (id3v2.2-frame text-info-frame) ())
+
+(define-binary-class text-info-frame-v2.3 (id3v2.3-frame text-info-frame) ())
+
+(define-binary-class comment-frame ()
+  ((encoding u1)
+   (language (iso-8859-1-string :length 3))
+   (description (id3-encoded-string :encoding encoding :terminator +null+))
+   (text (id3-encoded-string
+	  :encoding encoding
+	  :length (bytes-left
+		   (+ 1 ; encoding
+		      3 ; language
+		      (encoded-string-length description encoding t)))))))
+
+(defun encoded-string-length (string encoding terminated)
+  (let ((characters (+ (length string) (if terminated 1 0))))
+    (* characters (ecase encoding (0 1) (1 2)))))
+
+(define-binary-class comment-frame-v2.2 (id3v2.2-frame comment-frame) ())
+
+(define-binary-class comment-frame-v2.3 (id3v2.3-frame comment-frame) ())
+
+
+
+
+
+
+
+
+
 
