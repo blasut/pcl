@@ -148,8 +148,20 @@
    (size u3))
   (:dispatch (find-frame-class id)))
 
-(define-binary-class generic-frame (id3-frame)
-  ((data (raw-bytes :size size))))
+(define-binary-class generic-frame ()
+  ((data (raw-bytes :size (data-bytes (current-binary-object))))))
+
+(defgeneric data-bytes (frame))
+
+(defmethod data-bytes ((frame id3v2.2-frame))
+  (size frame))
+
+(defmethod data-bytes ((frame id3v2.3-frame))
+  (let ((flags (flags frame)))
+    (- (size frame)
+       (if (frame-compressed-p flags) 4 0)
+       (if (frame-encrypted-p flags) 1 0)
+       (if (frame-grouped-p flags)  1 0))))
 
 (define-binary-type raw-bytes (size)
   (:reader (in)
@@ -160,9 +172,9 @@
     (write-sequence buf out)))
 
 (defun find-frame-class (id)
-  (declare (ignore id))
-  'generic-frame)
-
+  (ecase (length id)
+    (3 'generic-frame-v2.2)
+    (4 'generic-frame-v2.3)))
 
 (define-binary-type id3-frames (tag-size frame-type)
   (:reader (in)
@@ -222,3 +234,47 @@
 (defun read-frame (frame-type in)
   (handler-case (read-value frame-type in)
     (in-padding () nil)))
+
+(defgeneric frame-header-size (frame))
+
+(define-tagged-binary-class id3v2.2-frame ()
+  ((id (frame-id :length 3))
+   (size u3))
+  (:dispatch (find-frame-class id)))
+
+(define-tagged-binary-class id3v2.3-frame ()
+  ((id                (frame-id :length 4))
+   (size              u4)
+   (flags             u2)
+   (decompressed-size (optional :type 'u4 :if (frame-compressed-p flags)))
+   (encryption-scheme (optional :type 'u1 :if (frame-encrypted-p flags)))
+   (grouping-identity (optional :type 'u1 :if (frame-grouped-p flags))))
+  (:dispatch (find-frame-class id)))
+
+(defun frame-compressed-p (flags) (logbitp 7 flags))
+
+(defun frame-encrypted-p (flags) (logbitp 6 flags))
+
+(defun frame-grouped-p (flags) (logbitp 5 flags))
+
+(defmethod frame-header-size ((frame id3v2.2-frame)) 6)
+
+(defmethod frame-header-size ((frame id3v2.3-frame)) 10)
+
+(define-binary-class generic-frame-v2.2 (id3v2.2-frame generic-frame) ())
+
+(define-binary-class generic-frame-v2.3 (id3v2.3-frame generic-frame) ())
+
+
+
+
+
+
+
+
+
+
+
+
+
+
