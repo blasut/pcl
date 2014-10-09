@@ -207,10 +207,6 @@
   (:writer (out id)
     (write-value 'iso-8859-1-string out id :length length)))
 
-(defun read-frame (in)
-  (handler-case (read-value 'id3-frame in)
-    (in-padding () nil)))
-
 
 (define-binary-class id3v2.2-tag (id3-tag)
   ((frames (id3-frames :tag-size size :frame-type 'id3v2.2-frame))))
