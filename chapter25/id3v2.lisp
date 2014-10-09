@@ -1,3 +1,4 @@
+
 (define-binary-type unsigned-integer (bytes bits-per-byte)
   (:reader (in)
     (loop with value = 0
@@ -58,6 +59,7 @@
       (when swap (setf code (swap-bytes code)))
       (or (code-char code) (error "Character code ~d not supported" code))))
 
+  (:writer (out char)
     (let ((code (char-code char)))
       (unless (<= 0 code #xffff)
         (error "Illegal character for ucs-2 encoding: ~c with char-code: ~d" char code))
@@ -264,17 +266,4 @@
 (define-binary-class generic-frame-v2.2 (id3v2.2-frame generic-frame) ())
 
 (define-binary-class generic-frame-v2.3 (id3v2.3-frame generic-frame) ())
-
-
-
-
-
-
-
-
-
-
-
-
-
 

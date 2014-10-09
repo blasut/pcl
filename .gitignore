@@ -3,4 +3,4 @@
 .*.lisp
 *#
 *.lx64fsl
-
+*.fasl
