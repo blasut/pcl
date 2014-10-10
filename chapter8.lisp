@@ -1,3 +1,10 @@
+(defpackage :pcl.macro-utilities
+  (:use :common-lisp)
+  (:export :primep
+	   :next-prime
+	   :with-gensyms
+	   :do-primes))
+
 (defun primep (number)
   (when (> number 1)
     (loop for fac from 2 to (isqrt number) never (zerop (mod number fac)))))
