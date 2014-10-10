@@ -121,3 +121,47 @@
 
 (defparameter *mp3s* (make-instance 'table :schema *mp3-schema*))
 
+(defun normalize-for-column (value column)
+  (funcall (value-normalizer column) value column))
+
+(defun normalize-row (names-and-values schema)
+  (loop
+       for column in schema
+       for name   = (name column)
+       for value  = (or (getf names-and-values name) (default-value column))
+       collect name
+       collect (normalize-for-column value column)))
+
+(defun insert-row (names-and-values table)
+  (vector-push-extend (normalize-row names-and-values (schema table)) (rows table)))
+
+(defun parse-track (track)
+  (when track (parse-integer track :end (position #\/ track))))
+
+(defun parse-year (year)
+  (when year (parse-integer year)))
+
+(defun file->row (file)
+  (let ((id3 (read-id3 file)))
+    (list
+     :file   (namestring (truename file))
+     :genre  (translated-genre id3)
+     :artist (artist id3)
+     :album  (album id3)
+     :song   (song id3)
+     :track  (parse-track (track id3))
+     :year   (parse-year (year id3))
+     :id3-size (size id3))))
+
+
+(defun load-database (dir db)
+  (let ((count 0))
+    (walk-directory
+     dir
+     #'(lambda (file)
+	 (princ #\.)
+	 (incf count)
+	 (insert-row (file->row file) db))
+     :test #'mp3-p)
+    (format t "~&Loaded ~d files into database." count)))
+
